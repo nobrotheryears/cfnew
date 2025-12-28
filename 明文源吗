@@ -92,7 +92,7 @@
     const ADDRESS_TYPE_IPV4 = 1;
     const ADDRESS_TYPE_URL = 2;
     const ADDRESS_TYPE_IPV6 = 3;
-
+    
     function isValidFormat(str) {
         const userRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         return userRegex.test(str);
@@ -1718,11 +1718,50 @@
             }
         }
         
+// 逻辑：检查 KV 名单
+    // 注意：kvConfig 是你代码中已经加载的配置，我们假设它存了一个名为 'auto_black' 的字段
+    let autoBlackList = kvConfig['auto_black'] || "";
+    let isAutoBlack = autoBlackList.split(',').includes(host);
+
+    if (isAutoBlack) {
+        await retryConnection();
+        return;
+    }
+    
         try {
             const initialSocket = await connectAndSend(host, portNum, enableSocksDowngrade ? false : isSocksEnabled);
             remoteConnWrapper.socket = initialSocket;
             connectStreams(initialSocket, ws, respHeader, retryConnection);
         } catch (err) {
+function isNetworkLinkError(err) {
+    if (!err || !err.message) return false;
+    
+    const msg = err.message.toLowerCase();
+
+    // 1. 这些是 Socket 层的“403” (Forbidden/Access Denied)
+    const isAccessDenied = 
+        msg.includes("forbidden") ||           // 明确的禁止访问
+        msg.includes("prohibited") ||          // 被禁止的IP (Error 1000)
+        msg.includes("not allowed") ||         // 不允许访问
+        msg.includes("access denied") ||       // 访问被拒绝
+        msg.includes("refused");               // 连接被拒绝
+
+    // 2. 这些是链路级故障 (Timeout/Reset)
+    const isLinkError = msg.includes("reset") || msg.includes("timeout") || msg.includes("timed out");
+
+    return isAccessDenied || isLinkError;
+}
+            // 报错后，写入 KV
+if(isNetworkLinkError(err)){
+        if (kvStore) {
+            // 将当前域名加入并写回
+            let currentList = (await kvStore.get('auto_black')) || "";
+            if (!currentList.split(',').includes(host)) {
+                let newList = currentList ? `${currentList},${host}` : host;
+                // 异步写入，不阻塞当前的 retryConnection
+                ctx.waitUntil(kvStore.put('auto_black', newList));
+            }
+        }}
             retryConnection();
         }
     }
