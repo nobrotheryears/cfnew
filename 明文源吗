@@ -110,6 +110,24 @@
         
         return false;
     }
+    function isNetworkLinkError(err) {
+    if (!err || !err.message) return false;
+    
+    const msg = err.message.toLowerCase();
+
+    // 1. 这些是 Socket 层的“403” (Forbidden/Access Denied)
+    const isAccessDenied = 
+        msg.includes("forbidden") ||           // 明确的禁止访问
+        msg.includes("prohibited") ||          // 被禁止的IP (Error 1000)
+        msg.includes("not allowed") ||         // 不允许访问
+        msg.includes("access denied") ||       // 访问被拒绝
+        msg.includes("refused");               // 连接被拒绝
+
+    // 2. 这些是链路级故障 (Timeout/Reset)
+    const isLinkError = msg.includes("reset") || msg.includes("timeout") || msg.includes("timed out");
+
+    return isAccessDenied || isLinkError;
+}
 
     async function initKVStore(env) {
         
@@ -1632,7 +1650,7 @@
                 const respHeader = new Uint8Array([version[0], 0]);
                 const rawData = chunk.slice(rawIndex);
                 if (isDnsQuery) return forwardUDP(rawData, serverSock, respHeader);
-                await forwardTCP(addressType, hostname, port, rawData, serverSock, respHeader, remoteConnWrapper);
+                await forwardTCP(addressType, hostname, port, rawData, serverSock, respHeader, remoteConnWrapper,ctx);
                             return;
                         }
                     }
@@ -1642,7 +1660,7 @@
                         if (!tjResult.hasError) {
                             protocolType = atob('dHJvamFu');
                             const { addressType, port, hostname, rawClientData } = tjResult;
-                            await forwardTCP(addressType, hostname, port, rawClientData, serverSock, null, remoteConnWrapper);
+                            await forwardTCP(addressType, hostname, port, rawClientData, serverSock, null, remoteConnWrapper,ctx);
                             return;
                         }
                     }
@@ -1655,7 +1673,7 @@
         return new Response(null, { status: 101, webSocket: clientSock });
     }
 
-    async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remoteConnWrapper) {
+    async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remoteConnWrapper,ctx) {
         async function connectAndSend(address, port, useSocks = false) {
             const remoteSock = useSocks ?
                 await establishSocksConnection(addrType, address, port) :
@@ -1733,24 +1751,7 @@
             remoteConnWrapper.socket = initialSocket;
             connectStreams(initialSocket, ws, respHeader, retryConnection);
         } catch (err) {
-function isNetworkLinkError(err) {
-    if (!err || !err.message) return false;
-    
-    const msg = err.message.toLowerCase();
 
-    // 1. 这些是 Socket 层的“403” (Forbidden/Access Denied)
-    const isAccessDenied = 
-        msg.includes("forbidden") ||           // 明确的禁止访问
-        msg.includes("prohibited") ||          // 被禁止的IP (Error 1000)
-        msg.includes("not allowed") ||         // 不允许访问
-        msg.includes("access denied") ||       // 访问被拒绝
-        msg.includes("refused");               // 连接被拒绝
-
-    // 2. 这些是链路级故障 (Timeout/Reset)
-    const isLinkError = msg.includes("reset") || msg.includes("timeout") || msg.includes("timed out");
-
-    return isAccessDenied || isLinkError;
-}
             // 报错后，写入 KV
 if(isNetworkLinkError(err)){
         if (kvStore) {
@@ -1758,11 +1759,13 @@ if(isNetworkLinkError(err)){
             let currentList = (await kvStore.get('auto_black')) || "";
             if (!currentList.split(',').includes(host)) {
                 let newList = currentList ? `${currentList},${host}` : host;
+                // A. 同步更新内存快照，确保当前实例在不重启的情况下也能立即生效
+                    kvConfig['auto_black'] = newList;
                 // 异步写入，不阻塞当前的 retryConnection
                 ctx.waitUntil(kvStore.put('auto_black', newList));
             }
         }}
-            retryConnection();
+            await retryConnection();
         }
     }
 
