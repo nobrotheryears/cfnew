@@ -1605,7 +1605,7 @@
         }
     }
 
-    async function handleWsRequest(request) {
+    async function handleWsRequest(request, env, ctx) {
         // 检测并设置当前Worker地区，确保WebSocket请求能正确进行就近匹配
         if (!currentWorkerRegion || currentWorkerRegion === '') {
             if (manualWorkerRegion && manualWorkerRegion.trim()) {
