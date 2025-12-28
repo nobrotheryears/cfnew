@@ -1756,13 +1756,13 @@
 if(isNetworkLinkError(err)){
         if (kvStore) {
             // 将当前域名加入并写回
-            let currentList = (await kvStore.get('auto_black')) || "";
+            let currentList = kvConfig['auto_black'] || "";
             if (!currentList.split(',').includes(host)) {
                 let newList = currentList ? `${currentList},${host}` : host;
                 // A. 同步更新内存快照，确保当前实例在不重启的情况下也能立即生效
                     kvConfig['auto_black'] = newList;
                 // 异步写入，不阻塞当前的 retryConnection
-                ctx.waitUntil(kvStore.put('auto_black', newList));
+                saveKVConfig();
             }
         }}
             retryConnection();
