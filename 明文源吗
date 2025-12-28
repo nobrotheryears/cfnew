@@ -1742,7 +1742,7 @@
     let isAutoBlack = autoBlackList.split(',').includes(host);
 
     if (isAutoBlack) {
-        await retryConnection();
+        retryConnection();
         return;
     }
     
@@ -1765,7 +1765,7 @@ if(isNetworkLinkError(err)){
                 ctx.waitUntil(kvStore.put('auto_black', newList));
             }
         }}
-            await retryConnection();
+            retryConnection();
         }
     }
 
