@@ -556,7 +556,7 @@
             }
 
             if (request.headers.get('Upgrade') === atob('d2Vic29ja2V0')) {
-                return await handleWsRequest(request);
+                return await handleWsRequest(request, env, ctx);
                 }
                 
                 if (request.method === 'GET') {
