@@ -1751,7 +1751,7 @@
             remoteConnWrapper.socket = initialSocket;
             connectStreams(initialSocket, ws, respHeader, retryConnection);
         } catch (err) {
-
+            retryConnection();
             // 报错后，写入 KV
 if(isNetworkLinkError(err)){
         if (kvStore) {
@@ -1762,10 +1762,10 @@ if(isNetworkLinkError(err)){
                 // A. 同步更新内存快照，确保当前实例在不重启的情况下也能立即生效
                     kvConfig['auto_black'] = newList;
                 // 异步写入，不阻塞当前的 retryConnection
-                saveKVConfig();
+                await saveKVConfig();
             }
         }}
-            retryConnection();
+            
         }
     }
 
