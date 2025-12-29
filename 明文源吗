@@ -1674,6 +1674,7 @@
     }
 
     async function forwardTCP(addrType, host, portNum, rawData, ws, respHeader, remoteConnWrapper,ctx) {
+        console.log(`进入1677`);
         async function connectAndSend(address, port, useSocks = false) {
             const remoteSock = useSocks ?
                 await establishSocksConnection(addrType, address, port) :
@@ -1742,11 +1743,13 @@
     let isAutoBlack = autoBlackList.split(',').includes(host);
 
     if (isAutoBlack) {
+        console.log(`自动黑`);
         retryConnection();
         return;
     }
     
         try {
+            console.log(`开始尝试`);
             const initialSocket = await connectAndSend(host, portNum, enableSocksDowngrade ? false : isSocksEnabled);
             remoteConnWrapper.socket = initialSocket;
             connectStreams(initialSocket, ws, respHeader, retryConnection);
